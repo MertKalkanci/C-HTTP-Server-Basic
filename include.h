@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <signal.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -13,10 +14,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+
 #include <pthread.h>
 #include <semaphore.h>
-
-#include <sys/select.h>
 
 #define SERVER_PORT 8080
 #define MAXLINE 1024

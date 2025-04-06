@@ -6,13 +6,20 @@ pthread_t thread_pool[THREAD_POOL_SIZE];
 pthread_mutex_t mutex;
 pthread_cond_t sleep_condition;
 
+int listenfd, connfd;
+volatile bool close_program = false;
+
+void handle_interrupt(int sig);
 void *thread_function(void *arg);
 int accept_connection(int listenfd);
 
 int main(void)
 {
-    int listenfd, connfd;
-    struct sockaddr_in server_addr;
+    struct sigaction interrupt_handler;
+    interrupt_handler.sa_handler = handle_interrupt;
+
+    sigaction(SIGINT, &interrupt_handler, NULL);
+    sigaction(SIGTSTP, &interrupt_handler, NULL);
 
     pthread_mutex_init(&mutex, NULL);
     pthread_cond_init(&sleep_condition, NULL);
@@ -20,6 +27,8 @@ int main(void)
     {
         pthread_create(&thread_pool[i], NULL, thread_function, NULL);
     }
+
+    struct sockaddr_in server_addr;
 
     if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
     {
@@ -31,6 +40,12 @@ int main(void)
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     server_addr.sin_port = htons(SERVER_PORT);
+
+    if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) 
+    {
+        perror("setsockopt error");
+        exit(1);
+    }
 
     if (bind(listenfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) 
     {
@@ -51,7 +66,7 @@ int main(void)
     //FD_ZERO(&current_sockets);
     //FD_SET(listenfd, &current_sockets);
 
-    while (true)
+    while (!close_program)
     {
         connfd = accept_connection(listenfd);
                 
@@ -63,6 +78,7 @@ int main(void)
         pthread_cond_signal(&sleep_condition);
         pthread_mutex_unlock(&mutex); 
     }
+
     exit(0);
 }
 
@@ -89,7 +105,7 @@ int accept_connection(int listenfd)
 
 void *thread_function(void *arg)
 {
-    while (true)
+    while (!close_program)
     {
         pthread_mutex_lock(&mutex);
         int *p_connfd = dequeue();
@@ -106,4 +122,30 @@ void *thread_function(void *arg)
             handle_request(p_connfd);
         }
     }
+
+    printf("Thread %ld exiting...\n", pthread_self());
+    pthread_exit(NULL);
+}
+
+void handle_interrupt(int sig)
+{
+    write(STDOUT_FILENO,"\nReceived an interrupt signal, trying to close program properly...\n", 68);
+    close_program = true;
+    for (int i = 0; i < THREAD_POOL_SIZE; i++)
+    {
+        pthread_mutex_unlock(&mutex);
+        pthread_cond_signal(&sleep_condition);
+    }
+
+    for (int i = 0; i < THREAD_POOL_SIZE; i++)
+    {
+        pthread_join(thread_pool[i], NULL);
+    }
+    write(STDOUT_FILENO,"All threads have exited, closing sockets...\n", 45);
+    
+    close(listenfd);
+    close(connfd);
+
+    write(STDOUT_FILENO,"Sockets closed, exiting program...\n", 36);
+    exit(0);
 }
