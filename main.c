@@ -1,26 +1,22 @@
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <signal.h>
-#include <errno.h>
+#include "include.h"
+#include "requesthandler.h"
+ #include "queue.h"
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
+pthread_t thread_pool[THREAD_POOL_SIZE];
+pthread_mutex_t mutex;
 
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
+void *thread_function(void *arg);
 
-#define SERVER_PORT 8080
-#define MAXLINE 1024
-
-int main(int argc, char **argv)
+int main(void)
 {
-    int listenfd, connfd, n;
-    int sendbytes;
+    int listenfd, connfd;
     struct sockaddr_in server_addr;
-    char buff[MAXLINE+1];
-    char recvline[MAXLINE+1];
+
+    pthread_mutex_init(&mutex, NULL);
+    for (int i = 0; i < THREAD_POOL_SIZE; i++)
+    {
+        pthread_create(&thread_pool[i], NULL, thread_function, NULL);
+    }
 
     if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
     {
@@ -51,32 +47,46 @@ int main(int argc, char **argv)
     {
         struct sockaddr_in client_addr;
         socklen_t client_addr_len;
+        char client_addr_str[MAXLINE];
 
         connfd = accept(listenfd, (struct sockaddr *)&client_addr, &client_addr_len);
 
-        memset(recvline, 0, sizeof(recvline));
-        while ((n = recv(connfd, recvline, MAXLINE-1, 0)) > 0)
+        inet_ntop(AF_INET, &client_addr, client_addr_str, MAXLINE);
+        printf("Client connected: %s\n", client_addr_str);
+                
+        int *p_connfd = malloc(sizeof(int));
+        *p_connfd = connfd;
+        
+        pthread_mutex_lock(&mutex);
+        enqueue(p_connfd);
+        pthread_mutex_unlock(&mutex);
+        /*
+        pthread_t tid;
+
+        if (pthread_create(&tid, NULL, handle_request, p_connfd) != 0)
         {
-            printf("%s\n", recvline);
-            
-            // Check if the last character is \r\n\r\n with strcmp
-            if (recvline[n-1] == '\n')
-            {   
-                break;
-            }
-            memset(recvline, 0, MAXLINE);
-        }
-        if (n < 0)
-        {
-            perror("recv error");
+            perror("pthread_create error");
             close(connfd);
+            free(p_connfd);
             continue;
         }
-        
-        snprintf((char*)buff, sizeof(buff), "HTTP /1.1 200 OK\r\n\r\n<h1>Hello</h1>");
-
-        send(connfd, buff, strlen(buff), 0);
-        close(connfd);
+        */
     }
     exit(0);
+}
+
+
+void *thread_function(void *arg)
+{
+    while (true)
+    {
+        //sem_wait(&sem);
+        pthread_mutex_lock(&mutex);
+        int *p_connfd = dequeue();
+        pthread_mutex_unlock(&mutex);
+        if (p_connfd != NULL)
+        {
+            handle_request(p_connfd);
+        }
+    }
 }

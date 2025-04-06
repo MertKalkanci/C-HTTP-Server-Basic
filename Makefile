@@ -1,10 +1,15 @@
 CC=gcc
 CFLAGS=-g -Wall -Wextra -pedantic
+BIN=main
+OBJ=main.o queue.o requesthandler.o
 
-all: main
+all: $(BIN)
 
-main: main.c
-	$(CC) $(CFLAGS) -o main main.c
+main: $(OBJ)
+	$(CC) $(CFLAGS) -o $@ $^
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c -o $@ $^
 
 clean:
-	rm ./main
+	rm -rf *.dSYM $(BIN) $(OBJ)
