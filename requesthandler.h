@@ -3,6 +3,6 @@
 
 #include "include.h"
 
-void handle_request(void *p_connfd);
+void handle_request(int *p_connfd);
 
 #endif

@@ -1,6 +1,6 @@
 #include "include.h"
 #include "requesthandler.h"
- #include "queue.h"
+#include "queue.h"
 
 pthread_t thread_pool[THREAD_POOL_SIZE];
 pthread_mutex_t mutex;
@@ -15,19 +15,33 @@ int accept_connection(int listenfd);
 
 int main(void)
 {
+    //print settings
+    printf("DEBUG_PRINT_INCOMING_REQUESTS: %s\n", DEBUG_PRINT_INCOMING_REQUESTS ? "true" : "false");
+    printf("SINGLE_THREAD: %s\n", SINGLE_THREAD ? "true" : "false");
+    if (!SINGLE_THREAD)
+    {
+        printf("THREAD_POOL_SIZE: %d\n", THREAD_POOL_SIZE);
+    }
+
+    //interrupt handling
     struct sigaction interrupt_handler;
     interrupt_handler.sa_handler = handle_interrupt;
 
     sigaction(SIGINT, &interrupt_handler, NULL);
     sigaction(SIGTSTP, &interrupt_handler, NULL);
-
-    pthread_mutex_init(&mutex, NULL);
-    pthread_cond_init(&sleep_condition, NULL);
-    for (int i = 0; i < THREAD_POOL_SIZE; i++)
+    
+    //initialize thread pool
+    if(!SINGLE_THREAD)
     {
-        pthread_create(&thread_pool[i], NULL, thread_function, NULL);
+        pthread_mutex_init(&mutex, NULL);
+        pthread_cond_init(&sleep_condition, NULL);
+        for (int i = 0; i < THREAD_POOL_SIZE; i++)
+        {
+            pthread_create(&thread_pool[i], NULL, thread_function, NULL);
+        }
     }
 
+    //initialize socket
     struct sockaddr_in server_addr;
 
     if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
@@ -61,22 +75,32 @@ int main(void)
 
     printf("Server is listening on port %d\n", SERVER_PORT);
 
-    //fd_set current_sockets, ready_sockets;
-
-    //FD_ZERO(&current_sockets);
-    //FD_SET(listenfd, &current_sockets);
-
-    while (!close_program)
+    if (SINGLE_THREAD)
     {
-        connfd = accept_connection(listenfd);
-                
-        int *p_connfd = malloc(sizeof(int));
-        *p_connfd = connfd;
-        
-        pthread_mutex_lock(&mutex);
-        enqueue(p_connfd);
-        pthread_cond_signal(&sleep_condition);
-        pthread_mutex_unlock(&mutex); 
+        while (!close_program)
+        {
+            connfd = accept_connection(listenfd);
+                    
+            int *p_connfd = malloc(sizeof(int));
+            *p_connfd = connfd;
+            
+            handle_request(p_connfd);
+        }
+    }
+    else
+    {
+        while (!close_program)
+        {
+            connfd = accept_connection(listenfd);
+                    
+            int *p_connfd = malloc(sizeof(int));
+            *p_connfd = connfd;
+            
+            pthread_mutex_lock(&mutex);
+            enqueue(p_connfd);
+            pthread_cond_signal(&sleep_condition);
+            pthread_mutex_unlock(&mutex); 
+        }
     }
 
     exit(0);
@@ -105,6 +129,7 @@ int accept_connection(int listenfd)
 
 void *thread_function(void *arg)
 {
+    printf("Thread %ld started...\n", pthread_self());
     while (!close_program)
     {
         pthread_mutex_lock(&mutex);
@@ -131,17 +156,21 @@ void handle_interrupt(int sig)
 {
     write(STDOUT_FILENO,"\nReceived an interrupt signal, trying to close program properly...\n", 68);
     close_program = true;
-    for (int i = 0; i < THREAD_POOL_SIZE; i++)
-    {
-        pthread_mutex_unlock(&mutex);
-        pthread_cond_signal(&sleep_condition);
-    }
 
-    for (int i = 0; i < THREAD_POOL_SIZE; i++)
+    if(!SINGLE_THREAD)
     {
-        pthread_join(thread_pool[i], NULL);
+        for (int i = 0; i < THREAD_POOL_SIZE; i++)
+        {
+            pthread_mutex_unlock(&mutex);
+            pthread_cond_signal(&sleep_condition);
+        }
+    
+        for (int i = 0; i < THREAD_POOL_SIZE; i++)
+        {
+            pthread_join(thread_pool[i], NULL);
+        }
+        write(STDOUT_FILENO,"All threads have exited, closing sockets...\n", 45);
     }
-    write(STDOUT_FILENO,"All threads have exited, closing sockets...\n", 45);
     
     close(listenfd);
     close(connfd);

@@ -1,9 +1,9 @@
 #include "include.h"
 #include "requesthandler.h"
 
-void handle_request(void *p_connfd)
+void handle_request(int *p_connfd)
 {
-    int connfd = *((int*)p_connfd);
+    int connfd = *p_connfd;
     free(p_connfd);
 
     int n;
@@ -14,9 +14,12 @@ void handle_request(void *p_connfd)
     
     while ((n = recv(connfd, recvline, MAXLINE-1, 0)) > 0)
     {
-        //printf("%s\n", recvline);
-        
-        // Check if the last character is \r\n\r\n with strcmp
+        if(DEBUG_PRINT_INCOMING_REQUESTS)
+        {
+            printf("%s\n", recvline); //to debug
+        }
+
+        // Check if the last character is \r\n\r\n at the future
         if (recvline[n-1] == '\n')
         {   
             break;
