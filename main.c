@@ -4,8 +4,10 @@
 
 pthread_t thread_pool[THREAD_POOL_SIZE];
 pthread_mutex_t mutex;
+pthread_cond_t sleep_condition;
 
 void *thread_function(void *arg);
+int accept_connection(int listenfd);
 
 int main(void)
 {
@@ -13,6 +15,7 @@ int main(void)
     struct sockaddr_in server_addr;
 
     pthread_mutex_init(&mutex, NULL);
+    pthread_cond_init(&sleep_condition, NULL);
     for (int i = 0; i < THREAD_POOL_SIZE; i++)
     {
         pthread_create(&thread_pool[i], NULL, thread_function, NULL);
@@ -43,47 +46,61 @@ int main(void)
 
     printf("Server is listening on port %d\n", SERVER_PORT);
 
+    //fd_set current_sockets, ready_sockets;
+
+    //FD_ZERO(&current_sockets);
+    //FD_SET(listenfd, &current_sockets);
+
     while (true)
     {
-        struct sockaddr_in client_addr;
-        socklen_t client_addr_len;
-        char client_addr_str[MAXLINE];
-
-        connfd = accept(listenfd, (struct sockaddr *)&client_addr, &client_addr_len);
-
-        inet_ntop(AF_INET, &client_addr, client_addr_str, MAXLINE);
-        printf("Client connected: %s\n", client_addr_str);
+        connfd = accept_connection(listenfd);
                 
         int *p_connfd = malloc(sizeof(int));
         *p_connfd = connfd;
         
         pthread_mutex_lock(&mutex);
         enqueue(p_connfd);
-        pthread_mutex_unlock(&mutex);
-        /*
-        pthread_t tid;
-
-        if (pthread_create(&tid, NULL, handle_request, p_connfd) != 0)
-        {
-            perror("pthread_create error");
-            close(connfd);
-            free(p_connfd);
-            continue;
-        }
-        */
+        pthread_cond_signal(&sleep_condition);
+        pthread_mutex_unlock(&mutex); 
     }
     exit(0);
 }
 
+int accept_connection(int listenfd)
+{
+    int connfd;
+    struct sockaddr_in client_addr;
+    socklen_t client_addr_len;
+    char client_addr_str[MAXLINE];
+
+    connfd = accept(listenfd, (struct sockaddr *)&client_addr, &client_addr_len);
+
+    if (connfd < 0)
+    {
+        perror("accept error");
+        return -1;
+    }
+
+    inet_ntop(AF_INET, &client_addr, client_addr_str, MAXLINE);
+    printf("Client connected: %s\n", client_addr_str);
+
+    return connfd;
+}
 
 void *thread_function(void *arg)
 {
     while (true)
     {
-        //sem_wait(&sem);
         pthread_mutex_lock(&mutex);
         int *p_connfd = dequeue();
+        if (p_connfd == NULL)
+        {
+            pthread_cond_wait(&sleep_condition, &mutex);
+
+            p_connfd = dequeue();
+        }
         pthread_mutex_unlock(&mutex);
+
         if (p_connfd != NULL)
         {
             handle_request(p_connfd);

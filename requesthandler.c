@@ -14,7 +14,7 @@ void handle_request(void *p_connfd)
     
     while ((n = recv(connfd, recvline, MAXLINE-1, 0)) > 0)
     {
-        printf("%s\n", recvline);
+        //printf("%s\n", recvline);
         
         // Check if the last character is \r\n\r\n with strcmp
         if (recvline[n-1] == '\n')

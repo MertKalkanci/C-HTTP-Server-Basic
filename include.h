@@ -16,8 +16,10 @@
 #include <pthread.h>
 #include <semaphore.h>
 
+#include <sys/select.h>
+
 #define SERVER_PORT 8080
 #define MAXLINE 1024
-#define THREAD_POOL_SIZE 3
+#define THREAD_POOL_SIZE 10
 
 #endif
