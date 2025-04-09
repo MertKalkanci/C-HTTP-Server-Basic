@@ -20,8 +20,12 @@ void handle_request(int *p_connfd)
         }
 
         // Check if the last character is \r\n\r\n at the future
-        if (recvline[n-1] == '\n')
+        if (strstr(recvline,"\r\n\r\n") != NULL)
         {   
+            if (DEBUG_PRINT_INCOMING_REQUESTS)
+            {
+                printf("End of request\n");
+            }
             break;
         }
         memset(recvline, 0, MAXLINE);
