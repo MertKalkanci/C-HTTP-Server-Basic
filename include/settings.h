@@ -1,7 +1,9 @@
 #ifndef __SETTINGS_H__
 #define __SETTINGS_H__
 
-#define DEBUG_PRINT_INCOMING_REQUESTS true
+#define DEBUG_REQUEST_IP_ADDRESS false
+#define DEBUG_INCOMING_REQUEST_VERBOSELY false
+#define DEBUG_REQUEST_HANDLER true
 
 #define SINGLE_THREAD true
 #define THREAD_POOL_SIZE 10

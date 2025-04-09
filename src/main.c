@@ -16,7 +16,9 @@ int accept_connection(int listenfd);
 int main(void)
 {
     //print settings
-    printf("DEBUG_PRINT_INCOMING_REQUESTS: %s\n", DEBUG_PRINT_INCOMING_REQUESTS ? "true" : "false");
+    printf("DEBUG_REQUEST_IP_ADDRESS: %s\n", DEBUG_REQUEST_IP_ADDRESS ? "true" : "false");
+    printf("DEBUG_INCOMING_REQUEST_VERBOSELY: %s\n", DEBUG_INCOMING_REQUEST_VERBOSELY ? "true" : "false");
+    printf("DEBUG_REQUEST_HANDLER: %s\n", DEBUG_REQUEST_HANDLER ? "true" : "false");
     printf("SINGLE_THREAD: %s\n", SINGLE_THREAD ? "true" : "false");
     if (!SINGLE_THREAD)
     {
@@ -122,7 +124,10 @@ int accept_connection(int listenfd)
     }
 
     inet_ntop(AF_INET, &client_addr, client_addr_str, MAXLINE);
-    printf("Client connected: %s\n", client_addr_str);
+    if(DEBUG_REQUEST_IP_ADDRESS)
+    {
+        printf("Client connected: %s\n", client_addr_str);
+    }
 
     return connfd;
 }
