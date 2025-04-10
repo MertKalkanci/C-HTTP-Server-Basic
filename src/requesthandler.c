@@ -41,8 +41,8 @@ void handle_request(int *p_connfd)
             //GET / HTTP/1.1
             //GET /index.html HTTP/1.1
             // select the path 
-            char *path_start_p = get_req + strlen("GET") + 1;
-            char *path_end_p = strstr(path_start_p, "HTTP");
+            char *path_start_p = get_req + strlen("GET ");
+            char *path_end_p = strstr(path_start_p, "HTTP/1.1");
 
             if (path_end_p == NULL)
             {
