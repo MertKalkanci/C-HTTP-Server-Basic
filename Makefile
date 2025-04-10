@@ -3,7 +3,7 @@ CFLAGS=-g -Wall -Wextra -pedantic
 SRC_DIR=src
 INC_DIR=include
 BIN=main
-OBJ=main.o queue.o requesthandler.o
+OBJ=main.o server.o queue.o route.o requesthandler.o
 
 all: $(BIN)
 
