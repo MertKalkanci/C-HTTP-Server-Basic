@@ -20,7 +20,6 @@ void handle_request(int *p_connfd)
     free(p_connfd);
 
     int n;
-    char buff[MAXLINE];
     char recvline[MAXLINE];
 
     char request_path[MAXLINE];
@@ -87,49 +86,33 @@ void handle_request(int *p_connfd)
     // check if route exists
     route_t *route = search_route(root, request_path);
 
-
     if (route == NULL)
     {            
-        if (DEBUG_REQUEST_HANDLER)
+        return_routed_page(connfd, route_404, html_404_header);
+        
+        if(DEBUG_REQUEST_HANDLER)
         {
             printf("404 Route Not Found: %s\n====\n", request_path);
         }
-        return_404(connfd);
     }
     else
     {
-        // check if page_file exists
-        char full_path[MAXLINE];
-        snprintf(full_path, sizeof(full_path), "%s%s\0", file_path, route->value);
-
-        FILE *page_file = fopen(full_path, "r");
-        if(page_file != NULL)
+        int status = return_routed_page(connfd, route, html_success_header);
+        if(status != 0)
         {
-            // send header
-            snprintf(buff, sizeof(buff), "%s", html_success_header);
-            send(connfd, buff, strlen(buff), 0);
+            return_routed_page(connfd, route_404, html_404_header);
 
-            // read page_file and send to client
-            while (fgets(buff, sizeof(buff), page_file) != NULL)
+            if(DEBUG_REQUEST_HANDLER)
             {
-                send(connfd, buff, strlen(buff), 0);
+                printf("404 Page Not Found: %s\n====\n", route->value);
             }
-
-            if (DEBUG_REQUEST_HANDLER)
-            {
-                printf("200 OK: %s\n====\n", full_path);
-            }
-            fclose(page_file);
         }
         else
         {
             if (DEBUG_REQUEST_HANDLER)
             {
-                printf("500 Internal Error: Routed Page Not Found, Returning 404 Error to client\n");
-                printf("404 Page Not Found: %s\n====\n", full_path);
+                printf("200 OK: %s\n====\n", route->value);
             }
-            //TODO return 505 error
-            return_404(connfd);
         }
     }
 
@@ -137,28 +120,29 @@ void handle_request(int *p_connfd)
     return;
 }
 
-void return_404(int connfd)
+int return_routed_page(int connfd, route_t *route, char *request_header)
 {
+    char full_path[MAXLINE];
     char buff[MAXLINE];
-    // send 404 header
-    snprintf(buff, sizeof(buff), html_404_header);
+    
+    snprintf(full_path, sizeof(full_path), "%s%s\0", file_path, route->value);
+
+    FILE *page_file = fopen(full_path, "r");
+    if(page_file == NULL)
+    {
+        // file not found
+        return 1;
+    }
+    // send header
+    snprintf(buff, sizeof(buff), "%s", request_header);
     send(connfd, buff, strlen(buff), 0);
 
-    // read error page file and send to client        
-    FILE *error_page_file = fopen(error_page_file_path, "r");
-    if (error_page_file == NULL)
+    // read page_file and send to client
+    while (fgets(buff, sizeof(buff), page_file) != NULL)
     {
-        //printf("Error 404 page on path: %s not found!\n",error_page_file_path);
-        perror("Error 404 page at ./static/404.html path not found");
+        send(connfd, buff, strlen(buff), 0);
     }
-    else
-    {
-        while (fgets(buff, sizeof(buff), error_page_file) != NULL)
-        {
-            send(connfd, buff, strlen(buff), 0);
-        }
-        fclose(error_page_file);
-    }
-        
+    // close file
+    fclose(page_file);
+    return 0;
 }
-
