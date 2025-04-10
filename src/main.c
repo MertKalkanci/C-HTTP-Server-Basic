@@ -8,6 +8,7 @@ pthread_cond_t sleep_condition;
 
 int listenfd, connfd;
 volatile bool close_program = false;
+volatile bool force_close = false;
 
 void handle_interrupt(int sig);
 void *thread_function(void *arg);
@@ -159,6 +160,13 @@ void *thread_function(void *arg)
 
 void handle_interrupt(int sig)
 {
+    if(force_close)
+    {
+        write(STDOUT_FILENO,"\nForce closing program...\n", 27);
+        exit(0);
+    }
+    force_close = true;
+
     write(STDOUT_FILENO,"\nReceived an interrupt signal, trying to close program properly...\n", 68);
     close_program = true;
 
